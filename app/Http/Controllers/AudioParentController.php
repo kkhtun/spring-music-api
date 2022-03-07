@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AudioParent;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class AudioParentController extends Controller
 {
@@ -17,11 +18,16 @@ class AudioParentController extends Controller
         $page = $request->has('page') ? $request->get('page') : 1;
         $limit = $request->has('limit') ? $request->get('limit') : 10;
 
+        $query = AudioParent::orderBy('id', 'desc');
+        $data = $query->limit($limit)->offset(($page - 1) * $limit)->get();
+        $count = $query->count();
+
         return response()->json([
             'status' => true,
             'data' => [
-                'audioParents' => AudioParent::orderBy('id', 'desc')->limit($limit)->offset(($page - 1) * $limit)->get(),
-            ]
+                'audioParents' => $data
+            ],
+            "count" => $count
         ]);
     }
 
@@ -34,14 +40,12 @@ class AudioParentController extends Controller
      */
     public function store(Request $request)
     {
-
-
         try {
             $request->validate([
                 'name' => 'required|max:255',
                 'coverImg' => 'nullable|file'
             ]);
-            $coverImgFilePath = is_null($request->coverImg) ?  null : $request->file('coverImg')->store('audioParentCoverImgs', 'public');
+            $coverImgFilePath = is_null($request->coverImg) ?  null : $request->file('coverImg')->store('audioParentCoverImgs', 's3');
 
             $audioParent = new AudioParent();
             $audioParent->name = $request->name;
@@ -89,16 +93,21 @@ class AudioParentController extends Controller
      */
     public function update(Request $request, AudioParent $audioParent)
     {
+        $cover_img_path = null;
+        if ($request->coverImg) {
+            $cover_img_path = $request->file('coverImg')->store('audioParentCoverImgs', 's3');
+            Storage::disk("s3")->delete($audioParent->cover_img_path);
+        } else {
+            $cover_img_path = $audioParent->cover_img_path;
+        }
 
-        $this->request = $request;
-        $this->audioParent = $audioParent;
-        $this->cover_img_path = is_null($request->coverImg) ?  $audioParent->cover_img_path : $request->file('coverImg')->store('audioParentCoverImgs', 'public');
-        $this->data = [
+        $data = [
             'name' => is_null($request->name) ? $audioParent->name : $request->name,
+            'cover_img_path' => $cover_img_path
         ];
 
         try {
-            $this->$audioParent = AudioParent::where('id', $this->audioParent->id)->update($this->data);
+            $res = AudioParent::where('id', $audioParent->id)->update($data);
         } catch (\Exception $e) {
             return response()->json([
                 'updated' => false,
@@ -108,7 +117,8 @@ class AudioParentController extends Controller
         return response()->json([
             'updated' => true,
             'data' => [
-                'audioParent' => AudioParent::where('id', $this->audioParent->id)->first()
+                'audioParent' =>
+                AudioParent::find($audioParent->id)
             ]
         ]);
     }
@@ -121,6 +131,10 @@ class AudioParentController extends Controller
      */
     public function destroy(AudioParent $audioParent)
     {
+        if ($audioParent->cover_img_path) {
+            Storage::disk("s3")->delete($audioParent->cover_img_path);
+        }
+
         try {
             $audioParent->delete();
             return response()->json([

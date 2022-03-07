@@ -16,26 +16,28 @@ class AudioController extends Controller
      */
     public function index(Request $request)
     {
-
         $page = $request->has('page') ? $request->get('page') : 1;
         $limit = $request->has('limit') ? $request->get('limit') : 10;
-        $audios = Audio::orderBy('id', 'desc')->limit($limit)->offset(($page - 1) * $limit)->get();
+
+        $query = Audio::orderBy('id', 'desc');
+        $audios = $query->limit($limit)->offset(($page - 1) * $limit)->get();
+        $count = $query->count();
+
         $results = [];
         foreach ($audios as $audio) {
             array_push($results, [
                 "audio" => $audio,
                 "audioParents" => $audio->audioParents,
                 "categories" => $audio->categories,
-
             ]);
         }
-        array_push($results, ['count' => $limit]);
 
         return response()->json([
             'status' => true,
             'data' => [
                 'audios' => $results
-            ]
+            ],
+            'count' => $count
         ]);
     }
 
@@ -48,7 +50,6 @@ class AudioController extends Controller
     public function store(Request $request)
     {
         try {
-
             $request->validate([
                 'title' => 'required|max:255',
                 'artWorkFile' => 'nullable',
@@ -58,18 +59,24 @@ class AudioController extends Controller
             ]);
 
             $this->request = $request;
-            $this->artWorkFilePath = is_null($request->artWorkFile) ?  null : $this->request->file('artWorkFile')->store('artWorkFiles', 'public');
-            $this->audioFilePath = $this->request->file('audioFile')->store('audioFiles', 'public');
+
+            if ($request->artWorkFile) {
+                $this->artWorkFilePath = $this->request->file('artWorkFile')->store('artWorkFiles', 's3');
+            } else {
+                $this->artWorkFilePath = null;
+            }
+            $this->audioFilePath = $this->request->file('audioFile')->store('audioFiles', 's3');
             $this->categories = $this->request->categories;
             $this->audioParents = $this->request->audioParents;
+
             DB::transaction(function () {
                 $audio = new Audio();
                 $audio->title = $this->request->title;
                 $audio->art_work_file_path = $this->artWorkFilePath;
                 $audio->audio_file_path = $this->audioFilePath;
                 $audio->save();
-                $audio->categories()->sync(json_decode($this->request->categories, true));
-                $audio->audioParents()->sync(json_decode($this->request->audioParents, true));
+                $audio->categories()->sync($this->request->categories);
+                $audio->audioParents()->sync($this->request->audioParents);
                 $this->createdAudio = $audio;
             });
 
@@ -116,24 +123,30 @@ class AudioController extends Controller
      */
     public function update(Request $request, Audio $audio)
     {
-
         $this->audio = $audio;
         $this->request = $request;
-        $this->artWorkFilePath = is_null($request->artWorkFile) ?  $audio->art_work_file_path : $this->request->file('artWorkFile')->store('artWorkFiles', 'public');
-        $this->audioFilePath = is_null($request->audioFile) ? $audio->audio_file_path : $this->request->file('audioFile')->store('audioFiles', 'public');
+        if ($request->artWorkFile) {
+            $this->artWorkFilePath = $this->request->file('artWorkFile')->store('artWorkFiles', 's3');
+            Storage::disk('s3')->delete($audio->art_work_file_path);
+        } else {
+            $this->artWorkFilePath = $audio->art_work_file_path;
+        }
+        if ($request->audioFile) {
+            $this->audioFilePath = $this->request->file('audioFile')->store('audioFiles', 's3');
+            Storage::disk('s3')->delete($audio->audio_file_path);
+        } else {
+            $this->audioFilePath = $audio->audio_file_path;
+        }
         $this->data = [
             'title' => is_null($this->request->title) ? $this->audio->title : $this->request->title,
             'art_work_file_path' => $this->artWorkFilePath,
             'audio_file_path' => $this->audioFilePath,
         ];
-
         try {
             DB::transaction(function () {
-
                 Audio::where('id', $this->audio->id)->update($this->data);
-                // Storage::delete('file.jpg');
-                $this->audio->categories()->sync(json_decode($this->request->categories, true));
-                $this->audio->audioParents()->sync(json_decode($this->request->audioParents, true));
+                $this->audio->categories()->sync($this->request->categories);
+                $this->audio->audioParents()->sync($this->request->audioParents);
             });
         } catch (\Exception $e) {
             return response()->json([
@@ -160,12 +173,13 @@ class AudioController extends Controller
     public function destroy(Audio $audio)
     {
         try {
+            Storage::disk('s3')->delete($audio->art_work_file_path);
+            Storage::disk('s3')->delete($audio->audio_file_path);
+            $audio->categories()->sync([]);
+            $audio->audioParents()->sync([]);
             $audio->delete();
             return response()->json([
-                'deleted' => true,
-                'data' => [
-                    'audio' => $audio
-                ]
+                'deleted' => true
             ]);
         } catch (\Exception $e) {
             return response()->json([

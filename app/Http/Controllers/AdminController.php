@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Admin;
 use App\Models\AdminAuthToken;
+use Error;
 use Illuminate\Http\Request;
 
 class AdminController extends Controller
@@ -131,6 +132,7 @@ class AdminController extends Controller
     {
         try {
             $admin = Admin::where('email', $request->email)->first();
+            if (!$admin) throw new Error("User Not Found");
             if (password_verify($request->password, $admin->password)) {
                 $token = rand(1, 10000) . time();
                 $adminAuthToken = new AdminAuthToken;

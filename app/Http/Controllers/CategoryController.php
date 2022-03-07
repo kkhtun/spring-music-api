@@ -13,19 +13,21 @@ class CategoryController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function index(Request $request)
-
     {
-
         $page = $request->has('page') ? $request->get('page') : 1;
         $limit = $request->has('limit') ? $request->get('limit') : 10;
 
-        $category = Category::orderBy('id', 'desc')->limit($limit)->offset(($page - 1) * $limit)->get();
+        $query = Category::orderBy('id', 'desc');
+
+        $category = $query->limit($limit)->offset(($page - 1) * $limit)->get();
+        $count = $query->count();
+
         return response()->json([
             'status' => true,
             'data' => [
                 'categories' => $category,
-                'count' => $limit
-            ]
+            ],
+            'count' => $count
         ]);
     }
 
