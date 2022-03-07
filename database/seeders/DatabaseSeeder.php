@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
 
         // Seed super admin
         $admin = new Admin();
-        $admin->email = "admin";
+        $admin->email = "admin@gmail.com";
         $admin->password = password_hash("password", PASSWORD_DEFAULT);
         $admin->save();
     }
