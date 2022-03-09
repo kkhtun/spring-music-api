@@ -17,10 +17,17 @@ class AudioParentController extends Controller
     {
         $page = $request->has('page') ? $request->get('page') : 1;
         $limit = $request->has('limit') ? $request->get('limit') : 10;
+        $minified = (bool) $request->get('minified');
 
         $query = AudioParent::orderBy('id', 'desc');
-        $data = $query->limit($limit)->offset(($page - 1) * $limit)->get();
-        $count = $query->count();
+
+        if ($minified) {
+            $data = $query->get(['name', 'id']);
+            $count = $query->count();
+        } else {
+            $data = $query->limit($limit)->offset(($page - 1) * $limit)->get();
+            $count = $query->count();
+        }
 
         return response()->json([
             'status' => true,

@@ -16,11 +16,17 @@ class CategoryController extends Controller
     {
         $page = $request->has('page') ? $request->get('page') : 1;
         $limit = $request->has('limit') ? $request->get('limit') : 10;
+        $minified = (bool) $request->get('minified');
 
         $query = Category::orderBy('id', 'desc');
 
-        $category = $query->limit($limit)->offset(($page - 1) * $limit)->get();
-        $count = $query->count();
+        if ($minified) {
+            $category = $query->get(['category_name', 'id']);
+            $count = $query->count();
+        } else {
+            $category = $query->limit($limit)->offset(($page - 1) * $limit)->get();
+            $count = $query->count();
+        }
 
         return response()->json([
             'status' => true,

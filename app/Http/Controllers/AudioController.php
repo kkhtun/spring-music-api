@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Audio;
+use App\Models\AudioParent_Audio;
+use App\Models\Category;
+use App\Models\Category_Audio;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -19,8 +22,22 @@ class AudioController extends Controller
         $page = $request->has('page') ? $request->get('page') : 1;
         $limit = $request->has('limit') ? $request->get('limit') : 10;
 
-        $query = Audio::orderBy('id', 'desc');
-        $audios = $query->limit($limit)->offset(($page - 1) * $limit)->get();
+        $category_id = $request->get('category');
+        $audio_parent_id = $request->get('audio_parent');
+        $query = new Audio();
+        if ($category_id) {
+            $query = $query->whereHas('categories', function ($query) use ($category_id) {
+                $query->where('category_id', $category_id);
+            });
+        }
+
+        if ($audio_parent_id) {
+            $query = $query->whereHas('audioParents', function ($query) use ($audio_parent_id) {
+                $query->where('audio_parent_id', $audio_parent_id);
+            });
+        }
+
+        $audios = $query->orderBy('id', 'desc')->limit($limit)->offset(($page - 1) * $limit)->get();
         $count = $query->count();
 
         $results = [];

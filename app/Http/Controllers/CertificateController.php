@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Certificate;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class CertificateController extends Controller
 {
@@ -16,11 +17,13 @@ class CertificateController extends Controller
     {
         $page = $request->has('page') ? $request->get('page') : 1;
         $limit = $request->has('limit') ? $request->get('limit') : 10;
+        $query = Certificate::orderBy('id', 'desc');
         return response()->json([
             'status' => true,
             'data' => [
-                'certificates' => Certificate::orderBy('id', 'desc')->limit($limit)->offset(($page - 1) * $limit)->get(),
-            ]
+                'certificates' => $query->limit($limit)->offset(($page - 1) * $limit)->get(),
+            ],
+            'count' => $query->count()
         ]);
     }
 
@@ -34,11 +37,10 @@ class CertificateController extends Controller
     {
         try {
             $request->validate([
-                'title' => 'required|max:1000',
+                'title' => 'required|max:191',
                 'certificateImg' => 'required|file'
             ]);
-            $certificateImgFilePath = $request->file('certificateImg')->store('certificateImgs', 'public');
-
+            $certificateImgFilePath = $request->file('certificateImg')->store('certificateImgs', 's3');
             $certificate = new Certificate();
             $certificate->title = $request->title;
             $certificate->certificate_img_file_path = $certificateImgFilePath;
@@ -85,7 +87,12 @@ class CertificateController extends Controller
     public function update(Request $request, Certificate $certificate)
     {
         try {
-            $certificateImgFilePath = is_null($request->certificateImg) ?  $certificate->certificate_img_file_path : $request->file('certificateImg')->store('certificateImgs', 'public');
+            if ($request->certificateImg) {
+                $certificateImgFilePath = $request->file('certificateImg')->store('certificateImgs', 's3');
+                Storage::disk('s3')->delete($certificate->certificate_img_file_path);
+            } else {
+                $certificateImgFilePath = $certificate->certificate_img_file_path;
+            }
             $certificate->title = is_null($request->title) ? $certificate->title : $request->title;
             $certificate->certificate_img_file_path = $certificateImgFilePath;
             $certificate->save();
@@ -114,11 +121,11 @@ class CertificateController extends Controller
     {
         try {
             $certificate->delete();
+            if ($certificate->certificate_img_file_path) {
+                Storage::disk('s3')->delete($certificate->certificate_img_file_path);
+            }
             return response()->json([
                 'deleted' => true,
-                'data' => [
-                    'certificate' => $certificate
-                ]
             ]);
         } catch (\Exception $e) {
             return response()->json([
