@@ -24,8 +24,8 @@ class EnsureRequestIsValid
             if ($adminAuthToken) {
                 return $next($request);
             }
-            abort(401);
+            return response()->json(["error" => "Forbidden"], 403);
         }
-        abort(403);
+        return response()->json(["error" => "Unauthorized"], 401);
     }
 }

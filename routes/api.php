@@ -8,6 +8,7 @@ use App\Http\Controllers\Category_Audio_Controller;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VersionController;
 use App\Http\Middleware\EnsureAdminIsValid;
 use App\Http\Middleware\EnsureRequestIsValid;
 use Illuminate\Support\Facades\Route;
@@ -67,6 +68,13 @@ Route::middleware([EnsureAdminIsValid::class])->group(
         });
         Route::post('certificate', [CertificateController::class, 'store']);
 
+        // Versions
+        Route::prefix('versions')->group(function () {
+            Route::post('/', [VersionController::class, 'store']);
+            Route::patch('/{version}', [VersionController::class, 'update']);
+            Route::delete('/{version}', [VersionController::class, 'destroy']);
+        });
+
         // Category_Audio
         Route::post('category_audios/{categoryId}', [Category_Audio_Controller::class, 'category_audios']);
         Route::post('audio_categories/{audioId}', [Category_Audio_Controller::class, 'audio_categories']);
@@ -107,6 +115,12 @@ Route::middleware([EnsureRequestIsValid::class])->group(
         // FCM Routes
         Route::post('/fcm-token', [UserController::class, 'saveDeviceToken']);
         Route::post('/send-notification', [UserController::class, 'sendNotification']);
+
+        // Version Routes
+        Route::prefix('versions')->group(function () {
+            Route::get('', [VersionController::class, 'index']);
+            Route::get('/{version}', [VersionController::class, 'show']);
+        });
     }
 );
 

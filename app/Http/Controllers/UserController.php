@@ -9,7 +9,6 @@ class UserController extends Controller
 {
     public function saveDeviceToken(Request $request)
     {
-
         try {
             $request->validate([
                 'device_id' => 'required',
