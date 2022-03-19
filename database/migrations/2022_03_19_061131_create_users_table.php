@@ -17,6 +17,7 @@ class CreateUsersTable extends Migration
             $table->id();
             $table->string('device_id')->unique();
             $table->string('fcm_token')->nullable();
+            $table->timestamps();
         });
     }
 

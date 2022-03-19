@@ -7,6 +7,7 @@ use App\Http\Controllers\AudioParentController;
 use App\Http\Controllers\Category_Audio_Controller;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CertificateController;
+use App\Http\Controllers\UserController;
 use App\Http\Middleware\EnsureAdminIsValid;
 use App\Http\Middleware\EnsureRequestIsValid;
 use Illuminate\Support\Facades\Route;
@@ -102,6 +103,10 @@ Route::middleware([EnsureRequestIsValid::class])->group(
             Route::get('', [CertificateController::class, 'index']);
             Route::get('/{certificate}', [CertificateController::class, 'show']);
         });
+
+        // FCM Routes
+        Route::post('/fcm-token', [UserController::class, 'saveDeviceToken']);
+        Route::post('/send-notification', [UserController::class, 'sendNotification']);
     }
 );
 

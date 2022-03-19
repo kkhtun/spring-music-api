@@ -7,19 +7,30 @@ use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
-
     public function saveDeviceToken(Request $request)
     {
-        $user = new User;
-        $user->device_id = $request->device_id;
-        $user->fcm_token = $request->token;
-        $user->save();
-        return response()->json([
-            "data" => [
-                "token" => $user->fcm_token,
-                "device_id" => $user->device_id,
-            ]
-        ]);
+
+        try {
+            $request->validate([
+                'device_id' => 'required',
+                'fcm_token' => 'required',
+            ]);
+            $user = User::where("device_id", $request->device_id)->first();
+            if (!$user) $user = new User;
+            $user->device_id = $request->device_id;
+            $user->fcm_token = $request->fcm_token;
+            $user->save();
+            return response()->json([
+                "data" => [
+                    "fcm_token" => $user->fcm_token,
+                    "device_id" => $user->device_id,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                "error" => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function sendNotification(Request $request)
@@ -27,7 +38,7 @@ class UserController extends Controller
         $url = 'https://fcm.googleapis.com/fcm/send';
         $fcmTokens = User::whereNotNull('fcm_token')->pluck('fcm_token')->all();
 
-        $FcmKey = 'FIREBASE FCM KEY';
+        $fcmServerKey = env('FCM_SERVER_KEY');
 
         $data = [
             "registration_ids" => $fcmTokens,
@@ -40,7 +51,7 @@ class UserController extends Controller
         $RESPONSE = json_encode($data);
 
         $headers = [
-            'Authorization:key=' . $FcmKey,
+            'Authorization:key=' . $fcmServerKey,
             'Content-Type: application/json',
         ];
 
@@ -59,14 +70,13 @@ class UserController extends Controller
         if ($output === FALSE) {
             curl_error($ch);
             curl_close($ch);
-            return response(500)->send();
+            return response()->send([
+                "error" => "Something went wrong"
+            ], 500);
         }
         curl_close($ch);
         return response()->json([
-            "notification" => [
-                "title" => $request->title,
-                "body" => $request->body,
-            ],
+            "message" => json_encode($output),
             "status" => "success"
         ]);
     }
