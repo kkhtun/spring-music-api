@@ -34,7 +34,7 @@ class VersionRequest extends FormRequest
         return [
             "name" => $method === 'POST' ? "required|string" : "string",
             "playstore_url" => $method === 'POST' ? "required|string" : "string",
-            "remark" => "string",
+            "remark" => "string|nullable",
         ];
     }
 }
