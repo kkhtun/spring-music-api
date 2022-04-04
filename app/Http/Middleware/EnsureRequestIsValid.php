@@ -17,7 +17,7 @@ class EnsureRequestIsValid
      */
     public function handle(Request $request, Closure $next)
     {
-        if ($request->header('token') && $request->header('token') === "spring_music_007_mission_token") {
+        if ($request->header('token') && $request->header('token') === env('USER_REQUEST_TOKEN')) {
             return $next($request);
         } else if ($request->header('admin-token')) {
             $adminAuthToken = AdminAuthToken::where('admin_auth_token', $request->header('admin-token'))->first();
