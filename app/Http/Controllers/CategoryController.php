@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class CategoryController extends Controller
 {
@@ -21,17 +22,17 @@ class CategoryController extends Controller
         $query = Category::orderBy('id', 'desc');
 
         if ($minified) {
-            $category = $query->get(['category_name', 'id']);
+            $categories = $query->get(['category_name', 'id']);
             $count = $query->count();
         } else {
-            $category = $query->limit($limit)->offset(($page - 1) * $limit)->get();
+            $categories = $query->limit($limit)->offset(($page - 1) * $limit)->get();
             $count = $query->count();
         }
 
         return response()->json([
             'status' => true,
             'data' => [
-                'categories' => $category,
+                'categories' => $categories,
             ],
             'count' => $count
         ]);
@@ -48,12 +49,20 @@ class CategoryController extends Controller
         try {
             $request->validate([
                 'categoryName' => 'required|max:255',
-                'iconCode' => 'nullable|max:255'
+                'iconCode' => 'nullable|max:255',
+                'categoryArtwork' => 'nullable|file'
             ]);
+
+            if ($request->categoryArtwork) {
+                $categoryArtworkUrl = $request->file('categoryArtwork')->store('categoryArtwork', 's3');
+            } else {
+                $categoryArtworkUrl = null;
+            }
 
             $category = new Category();
             $category->category_name = $request->categoryName;
             $category->icon_code = $request->iconCode;
+            $category->category_artwork = $categoryArtworkUrl;
             $category->save();
 
             return response()->json([
@@ -97,6 +106,15 @@ class CategoryController extends Controller
     public function update(Request $request, Category $category)
     {
         try {
+
+            if ($request->categoryArtwork) {
+                $oldArtwork = $category->category_artwork;
+                $category->category_artwork = $request->file('categoryArtwork')->store('categoryArtwork', 's3');
+                Storage::disk("s3")->delete($oldArtwork);
+            } else {
+                $category->category_artwork = $category->category_artwork;
+            }
+
             $category->category_name = is_null($request->categoryName) ? $category->category_name : $request->categoryName;
             $category->icon_code = is_null($request->iconCode) ? $category->icon_code : $request->iconCode;
             $category->save();
@@ -123,8 +141,12 @@ class CategoryController extends Controller
      */
     public function destroy(Category $category)
     {
+
         try {
             $category->delete();
+            if ($category->category_artwork) {
+                Storage::disk("s3")->delete($category->category_artwork);
+            }
             return response()->json([
                 'deleted' => true,
                 'data' => [
